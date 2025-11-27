@@ -52,10 +52,10 @@ Roberta is a multipurpose ELT frontend-backend universal buseness platform for i
 ![Processed Data](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Roberta_processed_data.png)
 
 ### Campaign Optimizer
-![Campaign Optimizer](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Campaign_optimizer.png)
+![Campaign Optimizer](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Campain_optimizer.png)
 
 ### Video Script Scenario
-![Suggested Scenario](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Suggested_scenario.png)
+![Suggested Scenario](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Suggested_scenarion.png)
 
 ## Interactive results
 Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generation) over the analysis results, so you can ask for clarifications, explanations of individual comments, or details about the analysis methodology at any time.
