@@ -19,15 +19,6 @@ The platform can process information from web sources as well as existing databa
 
 After generating a report, RoBERTA evaluates proposed business strategies for their expected ROI impact, suggests targeted marketing approaches, and can optionally create promotional videos to support campaign deployment.
 
-## User flow
-- Enter your email.
-- Provide a website or list of websites of interest (e.g., review sites).
-- Click "Send report."
-
-
-## Report & architecture overview
-- When processing finishes, Roberta emails you a report with charts (for example, trends in positive vs. negative comments).
-- While the report is being generated you can preview an example report and its structure.
 
 
 ## How it works (technical flow)
