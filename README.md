@@ -43,7 +43,10 @@ Roberta is a multipurpose ELT frontend-backend universal buseness platform for i
   - Sends recommendations to the user by email.
   - Offers strategy analyser and targeted advertisemet scenario.
 
-## Top level Pipleline
+## Interactive results
+Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generation) over the analysis results, so you can ask for clarifications, explanations of individual comments, or details about the analysis methodology at any time.
+
+## Samples of RoBERTa at various stages
 
 | Frontend Interface | Analysis Results |
 |:------------------:|:----------------:|
@@ -53,8 +56,13 @@ Roberta is a multipurpose ELT frontend-backend universal buseness platform for i
 |:------------------:|:---------------------:|
 | <img src="https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Campain_optimizer.png" width="400"/> | <img src="https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Suggested_scenarion.png" width="400"/> |
 
-## Interactive results
-Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generation) over the analysis results, so you can ask for clarifications, explanations of individual comments, or details about the analysis methodology at any time.
+## Samples of generated videos and reports
+
+### 📄 Sample PDF Report
+[Download Sample Sentiment Analysis Report (PDF)](https://github.com/Vlasenko2006/RoBERTA_LL/raw/main/Images/sentiment_report.pdf)
+
+### 🎬 Demo Video
+[Watch Platform Demo Video (MP4)](https://github.com/Vlasenko2006/RoBERTA_LL/raw/main/Images/leadlink_web_final.mp4)
 
 ## Key features
 1. Flexible — configurable for many business use cases (e.g., restaurants, insurance valuation, creditworthiness assessments).  
