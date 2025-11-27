@@ -37,7 +37,7 @@ After generating a report, RoBERTA evaluates proposed business strategies for th
     - Risk assesment
   - Sends recommendations to the user by email.
   - Offers strategy analyser and targeted advertisemet scenario.
-
+  - Generates video according to the suggested scenario (limitted for now)
 ## Interactive results
 Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generation) over the analysis results, so you can ask for clarifications, explanations of individual comments, or details about the analysis methodology at any time.
 
