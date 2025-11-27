@@ -45,17 +45,13 @@ Roberta is a multipurpose ELT frontend-backend universal buseness platform for i
 
 ## Top level Pipleline
 
-### Frontend Interface
-![RoBERTA Frontend](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Roberta_frontpage.png)
+| Frontend Interface | Analysis Results |
+|:------------------:|:----------------:|
+| <img src="https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Roberta_frontpage.png" width="400"/> | <img src="https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Roberta_processed_data.png" width="400"/> |
 
-### Analysis Results
-![Processed Data](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Roberta_processed_data.png)
-
-### Campaign Optimizer
-![Campaign Optimizer](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Campain_optimizer.png)
-
-### Video Script Scenario
-![Suggested Scenario](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Suggested_scenarion.png)
+| Campaign Optimizer | Video Script Scenario |
+|:------------------:|:---------------------:|
+| <img src="https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Campain_optimizer.png" width="400"/> | <img src="https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Suggested_scenarion.png" width="400"/> |
 
 ## Interactive results
 Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generation) over the analysis results, so you can ask for clarifications, explanations of individual comments, or details about the analysis methodology at any time.
