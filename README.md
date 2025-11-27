@@ -60,94 +60,247 @@ Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generati
 
 ---
 
-## Architecture Overview
-
-### System Components
+## General Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         USER BROWSER                            │
-│                      http://localhost:3000                      │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    FRONTEND (nginx:alpine)                      │
-│                                                                 │
-│  • Serves static HTML/CSS/JavaScript                            │
-│  • User interface for submitting analysis jobs                  │
-│  • Real-time status updates                                     │
-│  • Results visualization                                        │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ HTTP POST /api/analyze
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      FastAPI API GATEWAY.                       │
-│                                                                 │
-│                                                                 │
-│  • Entry point for all API requests                             │
-│  • Request validation and routing                               │
-│  • Acts as reverse proxy to Python backend                      │
-│  • Health check aggregation                                     │
-│  • Future: Load balancing, rate limiting, auth                  │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ Proxy to Python
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              PYTHON BACKEND (FastAPI + Uvicorn)                │
-│                    http://localhost:8000                        │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 1. Load DistilBERT Model (transformers)                │   │
-│  │    • distilbert-base-uncased-finetuned-sst-2-english   │   │
-│  │    • 66M parameters, 256MB model size                  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                             │                                   │
-│  ┌─────────────────────────▼───────────────────────────────┐   │
-│  │ 2. Sentiment Analysis Pipeline                         │   │
-│  │    • Tokenize reviews                                  │   │
-│  │    • Run inference (positive/negative/neutral)         │   │
-│  │    • Aggregate sentiment distribution                  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                             │                                   │
-│  ┌─────────────────────────▼───────────────────────────────┐   │
-│  │ 3. LLM Summarization (Groq API)                        │   │
-│  │    • Llama 3.1 70B model                               │   │
-│  │    • Generate insights and recommendations             │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                             │                                   │
-│  ┌─────────────────────────▼───────────────────────────────┐   │
-│  │ 4. MLflow Experiment Tracking                          │   │
-│  │    • Log parameters (model, thresholds, settings)      │   │
-│  │    • Log metrics (sentiment ratios, processing time)   │   │
-│  │    • Store artifacts (PDF reports, JSON summaries)     │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                             │                                   │
-│  ┌─────────────────────────▼───────────────────────────────┐   │
-│  │ 5. Report Generation                                   │   │
-│  │    • Create PDF with matplotlib/reportlab              │   │
-│  │    • Generate JSON summaries                           │   │
-│  │    • Email delivery (optional)                         │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                             │                                   │
-│  ┌─────────────────────────▼───────────────────────────────┐   │
-│  │ 6. Cache Results (Redis - Ready)                       │   │
-│  │    • Cache sentiment predictions                       │   │
-│  │    • Cache LLM responses                               │   │
-│  │    • Reduce API costs and latency                      │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ Results
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     MLFLOW TRACKING SERVER                      │
-│                    http://localhost:5002                        │
-│                                                                 │
-│  • Experiment tracking UI                                      │
-│  • Compare runs side-by-side                                   │
-│  • View metrics, parameters, artifacts                         │
-│  • Download PDF reports and data                               │
-└─────────────────────────────────────────────────────────────────┘
+
+## Request Flow
+
+\`\`\`
+┌─────────────┐
+│ index.html  │  User fills form (company, email, URL)
+│ (port 3001) │  JavaScript: fetch('/api/analyze', {POST})
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   NGINX     │  Proxies /api/* → python-service:8001
+└──────┬──────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────┐
+│  main_api.py (FastAPI on port 8001)                  │
+│                                                       │
+│  STARTUP: CONFIG = load_all_configs()                │
+│           ├─► config/config.yaml      [ML params]    │
+│           ├─► config/config_names.yaml [Branding]    │
+│           └─► config/config_key.yaml   [API keys]    │
+│                                                       │
+│  ENDPOINTS:                                           │
+│  POST /api/analyze          → run_analysis_pipeline()│
+│  GET  /api/dashboard        → get_dashboard_data()   │
+│  POST /api/predict-campaign → predict_campaign_variants()
+│  POST /api/generate-video   → generate_video_script()│
+│  POST /api/chatbot          → chatbot.query()        │
+└──────┬───────────────┬───────────────┬───────────────┘
+       │               │               │
+       ▼               ▼               ▼
+┌─────────────┐ ┌──────────────┐ ┌─────────────────┐
+│ dashboard_  │ │ campaign_    │ │ video_script_   │
+│ data.py     │ │ predictor.py │ │ generator.py    │
+│             │ │              │ │                 │
+│ Reads:      │ │ Reads:       │ │ Reads:          │
+│ my_volume/  │ │ sentiment    │ │ summary.txt     │
+│ *.db, JSON  │ │ data         │ │                 │
+│             │ │              │ │                 │
+│ Returns:    │ │ Calls:       │ │ Calls:          │
+│ Dashboard   │ │ query_groq   │ │ query_groq_api()│
+│ metrics     │ │ _api()       │ │                 │
+└─────────────┘ └──────┬───────┘ └────────┬────────┘
+                       │                  │
+                       └────────┬─────────┘
+                                ▼
+                       ┌─────────────────┐
+                       │  Groq API       │
+                       │  (Llama 3.1)    │
+                       └─────────────────┘
+\`\`\`
+
+## Main Pipeline: run_analysis_pipeline()
+
+\`\`\`
+1. Download page         → cache/
+2. Extract text          → my_volume/{job_id}/extracted_text/
+3. Analyze sentiment     → my_volume/{job_id}/analysis_results.json
+4. Generate summaries    → my_volume/{job_id}/summary.txt (Groq)
+5. Generate recommendations → my_volume/{job_id}/recommendations.txt (Groq)
+6. Calculate risk        → my_volume/{job_id}/insurance_risk.json
+7. Generate PDF          → my_volume/{job_id}/report.pdf
+8. Send email            → SMTP with PDF attachment
+\`\`\`
+
+## Configuration Loading
+
+\`\`\`python
+load_all_configs()
+├─► config/config.yaml         # ML: model_name, cache_dir, thresholds
+├─► config/config_names.yaml   # Branding: colors, company name
+└─► config/config_key.yaml     # Secrets: groq.api_key, email.smtp
+\`\`\`
+
+## Key Functions
+
+| Endpoint | Function | What It Does |
+|----------|----------|--------------|
+| `/api/analyze` | `run_analysis_pipeline()` | Full 8-step sentiment analysis |
+| `/api/dashboard` | `get_dashboard_data()` | Aggregate metrics from all jobs |
+| `/api/predict-campaign` | `predict_campaign_variants()` | LLM suggests 3 campaign strategies |
+| `/api/generate-video` | `generate_video_script()` | LLM creates 60-sec video script |
+| `/api/chatbot` | `chatbot.query()` | RAG over results + FAISS |
+
+## Timing
+
+- **Cached URL**: 30 seconds
+- **New URL**: 2-5 minutes  
+- **Chatbot**: 1-3 seconds
+EOF
+```
+
+# Function Dependency Tree - LeadLink Sentiment Analysis Platform
+
+## Main API Pipeline (`main_api.py`)
+
+```
+run_analysis_pipeline()
+│
+├── cleanup_old_jobs()                                    [cleanup_old_jobs.py]
+├── initialize_mlflow_tracking()                          [pipeline_helpers.py]
+├── setup_analysis_directories()                          [pipeline_helpers.py]
+├── prepare_html_content()                                [pipeline_helpers.py]
+│   ├── download_page_fun()                              [download_page_fun.py]
+│   │   ├── download_with_selenium()
+│   │   └── download_with_requests()
+│   └── process_search_method()                          [search_methods_fun.py]
+│       ├── Google_Search()
+│       └── Multiple_URLs()
+│
+├── execute_sentiment_analysis()                          [pipeline_helpers.py]
+│   ├── extract_text_fun()                               [extract_text_fun.py]
+│   │   ├── extract_text_blocks()
+│   │   ├── clean_text()
+│   │   ├── save_text_blocks()
+│   │   └── split_by_separators()
+│   │
+│   ├── Context_analyzer_RoBERTa_fun()                   [Context_analyzer_RoBERTa_fun.py]
+│   │   ├── load_combined_dataset()
+│   │   ├── analyze_sentiment_enhanced()
+│   │   │   └── compute_original_score()
+│   │   ├── normalize_scores_by_sentiment()
+│   │   └── track_sentiment_run()                       [mlflow_tracking.py]
+│   │
+│   ├── vizualization()                                  [vizualization.py]
+│   │   ├── read_extracted_text_files()
+│   │   ├── create_text_vectors()
+│   │   └── find_representative_comments()
+│   │
+│   └── summarize_sentiments_fun()                      [summarize_sentiments_fun.py]
+│       ├── read_representatives_json()
+│       ├── create_summary_prompt()
+│       ├── query_groq_api()
+│       ├── save_summary()
+│       ├── has_duplicate_sentence()
+│       └── is_quoted_or_citation()
+│
+├── generate_ai_summaries()                              [pipeline_helpers.py]
+│   ├── summarize_sentiments_fun()                      [see above]
+│   └── recommendation_fun()                            [recommendation_fun.py]
+│       ├── read_summary_file()
+│       ├── create_recommendation_prompt()
+│       ├── query_groq_api()
+│       └── save_recommendation()
+│
+├── calculate_and_save_insurance_risk()                  [pipeline_helpers.py]
+│   └── calculate_insurance_risk()                      [insurance_calculator.py]
+│       ├── _calculate_risk_score()
+│       ├── _determine_risk_level()
+│       ├── _analyze_trend_risk()
+│       └── _get_trend_status()
+│
+├── generate_and_copy_pdf()                              [pipeline_helpers.py]
+│   └── generate_pdf_fun()                              [pdf_generation/generate_pdf_fun.py]
+│       ├── load_company_name()                         [pdf_generation/pdf_styles.py]
+│       └── draw_header_stripe()                        [pdf_generation/pdf_header.py]
+│
+├── finalize_job_success()                               [pipeline_helpers.py]
+│   └── send_report_email_fun()                         [send_report_email_fun.py]
+│       └── send_email()                                [send_email.py]
+│           ├── create_email_message()
+│           └── attach_pdf_report()
+│
+└── handle_job_failure()                                 [pipeline_helpers.py]
+```
+
+## RAG Chatbot System (`chatbot_analyzer.py`)
+
+```
+ResultsChatbot class
+│
+├── __init__()
+│   ├── SentenceTransformer('paraphrase-MiniLM-L6-v2')
+│   ├── _initialize_candidate_kb()
+│   │   └── FAISS.from_texts()
+│   └── _initialize_results_index()
+│
+├── query()
+│   ├── _route_to_knowledge_base()
+│   ├── _retrieve_from_candidate_kb()
+│   │   └── candidate_index.similarity_search()
+│   ├── _retrieve_from_results()
+│   │   └── results_index.similarity_search()
+│   └── _generate_response()
+│       └── query_groq_api()
+│
+└── _extract_sentiment_data()
+```
+
+
+
+## Key Data Flow
+
+1. **User Request** → `run_analysis_pipeline()`
+2. **Download/Search** → `prepare_html_content()` → `download_page_fun()` or `process_search_method()`
+3. **Text Extraction** → `extract_text_fun()` → Individual review text files
+4. **Sentiment Analysis** → `Context_analyzer_RoBERTa_fun()` → JSON with scores
+5. **Visualization** → `vizualization()` → Representative comments selection
+6. **AI Summaries** → `summarize_sentiments_fun()` → Groq API → Summary text
+7. **Recommendations** → `recommendation_fun()` → Groq API → Action items
+8. **Risk Calculation** → `calculate_insurance_risk()` → Risk metrics JSON
+9. **PDF Generation** → `generate_pdf_fun()` → Branded PDF report
+10. **Email Delivery** → `send_report_email_fun()` → SMTP email with attachment
+11. **Chatbot Queries** → `ResultsChatbot.query()` → FAISS retrieval → Groq API → Response
+
+## External Dependencies
+
+- **HuggingFace Transformers**: DistilBERT model for sentiment classification
+- **Sentence Transformers**: paraphrase-MiniLM-L6-v2 for embeddings
+- **FAISS**: Vector similarity search for RAG
+- **Groq API**: LLM for summaries, recommendations, chatbot responses
+- **MLflow**: Experiment tracking and logging
+- **ReportLab**: PDF generation
+- **SMTP**: Email delivery
+- **Selenium/Requests**: Web scraping
+
+## Critical Paths
+
+### Fast Path (Cached)
+```
+run_analysis_pipeline → prepare_html_content (cache hit) → execute_sentiment_analysis → PDF → Email
+Time: ~30 seconds
+```
+
+### Full Path (New URL)
+```
+run_analysis_pipeline → download_page_fun (Selenium) → extract_text_fun → 
+Context_analyzer_RoBERTa_fun (ML inference) → vizualization → summarize_sentiments_fun (Groq) → 
+recommendation_fun (Groq) → calculate_insurance_risk → generate_pdf_fun → send_report_email_fun
+Time: 2-5 minutes
+```
+
+### Chatbot Path
+```
+User question → ResultsChatbot.query → route_to_knowledge_base → 
+FAISS similarity_search → retrieve context → Groq API → response
+Time: 1-3 seconds
 ```
 
 ### Request Flow Explained
