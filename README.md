@@ -26,6 +26,28 @@ Roberta is a multipurpose ELT frontend-backend universal buseness platform for i
 - While the report is being generated you can preview an example report and its structure.
 
 
+## 📸 RoBERTA in Action
+
+### Complete Pipeline Overview
+![RoBERTA Pipeline](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/RoBERTa.png)
+*End-to-end sentiment analysis architecture*
+
+### Sentiment Analysis Results
+![Sentiment Analysis](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Sentiment_analysis.png)
+*Real-time sentiment classification with confidence scores*
+
+### AI-Generated Summaries
+![AI Summaries](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/AI_Generated_Sentiment_Summaries.png)
+*LLM-powered insights and recommendations*
+
+### PDF Report Examples
+![Report Page 1](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Report1.png)
+*Professional branded reports with charts*
+
+![Report Page 2](https://raw.githubusercontent.com/Vlasenko2006/RoBERTA_LL/main/Images/Report2.png)
+*Detailed sentiment breakdowns and actionable insights*
+
+
 ## How it works (technical flow)
 - A user fills and submits a form in index.html with their name/company, email, search keywords, and optional parameters in the `index.html` form.
 - The FastAPI establishes communcation between frontend (index.html) top-level subroutine in backend (main.api) sending these requests from/to Python block that performs the main processing. The Python pipeline:
