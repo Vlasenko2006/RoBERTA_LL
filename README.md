@@ -62,9 +62,10 @@ Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generati
 
 ## General Architecture Overview
 
-```
 
-## Request Flow
+Here is the top-level view how Roberta pipeline evaluates. See also `main_api.py` pipeline bbelow
+
+```
 
 \`\`\`
 ┌─────────────┐
@@ -116,21 +117,12 @@ Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generati
                        └─────────────────┘
 \`\`\`
 
-## Main Pipeline: run_analysis_pipeline()
+```
 
-\`\`\`
-1. Download page         → cache/
-2. Extract text          → my_volume/{job_id}/extracted_text/
-3. Analyze sentiment     → my_volume/{job_id}/analysis_results.json
-4. Generate summaries    → my_volume/{job_id}/summary.txt (Groq)
-5. Generate recommendations → my_volume/{job_id}/recommendations.txt (Groq)
-6. Calculate risk        → my_volume/{job_id}/insurance_risk.json
-7. Generate PDF          → my_volume/{job_id}/report.pdf
-8. Send email            → SMTP with PDF attachment
-\`\`\`
 
 ## Configuration Loading
 
+```
 \`\`\`python
 load_all_configs()
 ├─► config/config.yaml         # ML: model_name, cache_dir, thresholds
@@ -138,25 +130,14 @@ load_all_configs()
 └─► config/config_key.yaml     # Secrets: groq.api_key, email.smtp
 \`\`\`
 
-## Key Functions
+```
 
-| Endpoint | Function | What It Does |
-|----------|----------|--------------|
-| `/api/analyze` | `run_analysis_pipeline()` | Full 8-step sentiment analysis |
-| `/api/dashboard` | `get_dashboard_data()` | Aggregate metrics from all jobs |
-| `/api/predict-campaign` | `predict_campaign_variants()` | LLM suggests 3 campaign strategies |
-| `/api/generate-video` | `generate_video_script()` | LLM creates 60-sec video script |
-| `/api/chatbot` | `chatbot.query()` | RAG over results + FAISS |
-
-## Timing
+### Timing
 
 - **Cached URL**: 30 seconds
 - **New URL**: 2-5 minutes  
 - **Chatbot**: 1-3 seconds
-EOF
-```
 
-# Function Dependency Tree - LeadLink Sentiment Analysis Platform
 
 ## Main API Pipeline (`main_api.py`)
 
@@ -322,52 +303,28 @@ Time: 1-3 seconds
 
 ##  Complete Feature List
 
-###  Sentiment Analysis Core
-
-| # | Feature | Description |
-|---|---------|-------------|
-| 1 | **DistilBERT Classification** | State-of-the-art transformer (66M params, SST-2 fine-tuned) |
-| 2 | **Multi-Class Sentiment** | Positive, Negative, Neutral detection with confidence scores |
-| 3 | **Batch Processing** | Efficient parallel analysis of 100+ reviews |
-| 4 | **Confidence Thresholds** | Configurable sensitivity for classification |
-| 5 | **Sentiment Distribution** | Aggregate statistics across all reviews |
-
-
 
 ###  MLflow Experiment Tracking
 
-| # | Feature | Description |
-|---|---------|-------------|
-| 17 | **Parameter Logging** | Model, thresholds, settings (15+ per run) |
-| 18 | **Metric Tracking** | Sentiment ratios, processing time, API usage (10+ metrics) |
-| 19 | **Artifact Storage** | PDFs, JSONs, recommendations versioned |
-| 20 | **Run Comparison** | Side-by-side experiment analysis |
-| 21 | **Experiment History** | Complete audit trail of all analyses |
-| 22 | **Reproducibility** | Every run fully reproducible with logged params |
 
-### 🧪 Testing & Quality
+ **Parameter Logging** | Model, thresholds, settings (15+ per run) |
+ **Metric Tracking** | Sentiment ratios, processing time, API usage (10+ metrics) |
+ **Artifact Storage** | PDFs, JSONs, recommendations versioned |
+ **Run Comparison** | Side-by-side experiment analysis |
+ **Experiment History** | Complete audit trail of all analyses |
+ **Reproducibility** | Every run fully reproducible with logged params |
 
-| # | Feature | Description |
-|---|---------|-------------|
-| 23 | **Unit Test Suite** | 21+ tests covering API and MLflow |
-| 24 | **API Endpoint Tests** | Health, config, analyze, status validated |
-| 25 | **MLflow Tests** | Parameter/metric/artifact logging verified |
-| 26 | **Coverage Reports** | pytest-cov for code coverage measurement |
-| 27 | **Async Testing** | pytest-asyncio for async endpoint tests |
-| 28 | **CI/CD Ready** | Test automation for GitHub Actions |
+###  Testing & Quality
 
-###  Architecture & Infrastructure
+ **Unit Test Suite** | 21+ tests covering API and MLflow |
+ **API Endpoint Tests** | Health, config, analyze, status validated |
+ **MLflow Tests** | Parameter/metric/artifact logging verified |
+ **Coverage Reports** | pytest-cov for code coverage measurement |
+ **Async Testing** | pytest-asyncio for async endpoint tests |
+ **CI/CD Ready** | Test automation for GitHub Actions |
 
-| # | Feature | Description |
-|---|---------|-------------|
-| 29 | **Microservices Design** | Frontend, .NET API, Python backend separation |
-| 30 | **Docker Containerization** | All services in isolated containers |
-| 31 | **Docker Compose** | One-command deployment |
-| 32 | **Health Checks** | Automated service monitoring |
-| 33 | **API Gateway Pattern** | .NET as entry point with routing |
-| 34 | **Horizontal Scaling** | Easy to add more Python workers |
 
-### ⚡ Performance & Optimization
+### Performance & Optimization
 
 Platform normaly runs on AWS micro3 instance (this AWS offers you for free).
 
