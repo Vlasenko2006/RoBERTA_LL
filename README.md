@@ -13,7 +13,7 @@
 # Roberta — ELT Frontend-Backend System for Content Analysis
 
 ## Summary
-Roberta is an ELT frontend-backend universal platform that processes information from both web sources and existing databases. It runs a three-model AI pipeline to analyze content (for example, customer reviews), extracts the most relevant and representative pieces of information (e.g., the most critical and the most typical comments), summarizes findings, and produces text and visual reports — for example, suggestions to improve your business, risk assessments, or insurance‑relevant conclusions.
+Roberta is an ELT frontend-backend universal platform that processes information from both web sources and existing databases. It runs a three-model AI pipeline to analyze content (for example, customer reviews), extracts the most relevant and representative pieces of information (e.g., the most critical and the most typical comments), summarizes findings, and produces text and visual reports — for example, suggestions to improve your business, risk assessments, or insurance‑relevant conclusions. After the report is generated, RoBERTa evaluates proposed business strategies for expected ROI impact, suggests targeted marketing scenarios, and can optionally generate a corresponding promotional video to support rollout.:
 
 ## User flow
 - Enter your email.
@@ -27,7 +27,8 @@ Roberta is an ELT frontend-backend universal platform that processes information
 
 
 ## How it works (technical flow)
-- The .NET frontend forwards the request to a Python script that performs the main processing. The Python pipeline:
+- A user writes and submits his requests (his/company name, e-mail, search keywords, etc.) in the `index.html`
+- The FastAPI establishes communcation between frontend (index.html) top-level subroutine in backend (main.api) sending these requests from/to Python block that performs the main processing. The Python pipeline:
   - Loads the specified sites and performs ELT processing.
   - Detects and extracts reviews from the raw text using rule-based methods and the DistilBERT model.
   - Performs vector and semantic analysis to identify the most representative and the most salient comments.
@@ -40,6 +41,10 @@ Roberta is an ELT frontend-backend universal platform that processes information
     - Prioritized recommendations for service improvement
     - Risk assesment
   - Sends recommendations to the user by email.
+
+## Top level Pipleline
+
+RoBERTa scheme goes here.
 
 ## Interactive results
 Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generation) over the analysis results, so you can ask for clarifications, explanations of individual comments, or details about the analysis methodology at any time.
