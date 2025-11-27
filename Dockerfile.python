@@ -1,0 +1,64 @@
+# Dockerfile for Python Sentiment Analysis Service
+FROM python:3.10-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching (using CPU-only version to avoid CUDA)
+COPY requirements-cpu.txt requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download transformer models during build (not runtime)
+# Commented out to prevent OOM on t3.micro during build
+# RUN python -c "from transformers import pipeline; \
+#     pipeline('sentiment-analysis', \
+#     model='distilbert-base-uncased-finetuned-sst-2-english', \
+#     device=-1)"
+
+# Copy application code
+COPY *.py ./
+
+# Copy config directory
+COPY config/ ./config/
+
+# Copy PDF generation module
+COPY pdf_generation/ ./pdf_generation/
+
+# Copy Images directory for PDF diagrams
+COPY Images/ ./Images/
+# Copy tests directory
+COPY tests/ ./tests/
+COPY CANDIDATE_KNOWLEDGE_BASE.md ./CANDIDATE_KNOWLEDGE_BASE.md
+
+# Create output directories
+RUN mkdir -p my_volume/sentiment_analysis \
+    my_volume/hf_model \
+    extracted_text \
+    cache \
+    /tmp/hf_cache
+
+# Set environment variables
+ENV TRANSFORMERS_CACHE=/tmp/hf_cache
+ENV HF_HOME=/tmp/hf_cache
+ENV PYTHONUNBUFFERED=1
+
+# Expose port for FastAPI
+EXPOSE 8000
+
+# Health check - give more time for ML models to load
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+    CMD curl --fail http://localhost:8000/health || exit 1
+
+# Run FastAPI wrapper with single worker (needed for in-memory job storage)
+# Use --workers 1 or remove --workers flag entirely
+CMD ["uvicorn", "main_api:app", "--host", "0.0.0.0", "--port", "8000"]

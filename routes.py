@@ -1,0 +1,562 @@
+from fastapi import APIRouter, BackgroundTasks, HTTPException, File, UploadFile, Request
+from fastapi.responses import FileResponse, JSONResponse
+from datetime import datetime
+from typing import Optional, Dict, Callable
+import os
+import json
+import uuid
+import logging
+
+from models import AnalysisRequest, JobStatus, ChatRequest, ChatResponse
+from chatbot_analyzer import ResultsChatbot
+
+logger = logging.getLogger(__name__)
+
+
+class Routes:
+    """
+    Routes class to encapsulate all API endpoints with access to shared state
+    """
+    def __init__(
+        self,
+        jobs_db: Dict,
+        chatbots: Dict,
+        run_analysis_pipeline: Callable,
+        names_config: dict,
+        base_config: dict,
+        key_config: dict
+    ):
+        self.jobs_db = jobs_db
+        self.chatbots = chatbots
+        self.run_analysis_pipeline = run_analysis_pipeline
+        self.names_config = names_config
+        self.base_config = base_config
+        self.key_config = key_config
+        self.router = APIRouter()
+        self._setup_routes()
+    
+    def get_company_name(self, company_name_param: Optional[str] = None) -> str:
+        """Helper to resolve company name from various sources"""
+        return (
+            company_name_param
+            or self.names_config.get('company_name')
+            or self.base_config.get('company_name')
+            or self.key_config.get('company_name')
+            or os.getenv('COMPANY_NAME')
+            or 'Awesome Company'
+        )
+    
+    def _setup_routes(self):
+        """Register all route handlers"""
+        
+        @self.router.get("/")
+        async def root():
+            """Root endpoint with API documentation"""
+            return {
+                "message": "Sentiment Analysis API",
+                "version": "1.0",
+                "endpoints": {
+                    "analyze": "/api/analyze",
+                    "status": "/api/status/{job_id}",
+                    "results": "/api/results/{job_id}",
+                    "health": "/health"
+                }
+            }
+        
+        @self.router.get("/health")
+        async def health_check():
+            """Health check endpoint for Docker"""
+            return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+        
+        @self.router.get("/api/config")
+        async def get_config():
+            """Get frontend configuration including company name"""
+            company_name = self.get_company_name()
+            return {
+                "company_name": company_name
+            }
+        
+        @self.router.post("/api/analyze", response_model=JobStatus)
+        async def analyze_reviews(
+            request: AnalysisRequest,
+            background_tasks: BackgroundTasks,
+            company_name: Optional[str] = None
+        ):
+            """
+            Start sentiment analysis job
+            
+            Accepts:
+            - url: TripAdvisor/Yelp URL (optional, deprecated)
+            - html_content: Raw HTML content (optional)
+            - email: Single email or comma-separated emails for report delivery (optional)
+            - emails: List of email addresses (alternative to email field)
+            - customPrompt: Custom LLM prompt (optional)
+            - searchMethod: 'keywords', 'urls', or 'demo' (default: 'demo')
+            """
+            # Resolve company name
+            company_name = self.get_company_name(company_name)
+
+            job_id = str(uuid.uuid4())
+            logger.info(f"📨 New analysis request - Job ID: {job_id}, Method: {request.searchMethod}, URL: {request.url}, Email: {request.email}")
+            
+            # Initialize job
+            self.jobs_db[job_id] = {
+                'job_id': job_id,
+                'status': 'queued',
+                'progress': 0,
+                'message': 'Job queued',
+                'created_at': datetime.now().isoformat()
+            }
+            
+            # Handle HTML content
+            html_path = None
+            if request.html_content:
+                cache_folder = f"cache/{job_id}"
+                os.makedirs(cache_folder, exist_ok=True)
+                html_path = f"{cache_folder}/reviews.html"
+                with open(html_path, 'w', encoding='utf-8') as f:
+                    f.write(request.html_content)
+            
+            # Process email addresses - support both formats
+            email_input = None
+            if request.emails:
+                # Use the emails list if provided
+                email_input = request.emails
+            elif request.email:
+                # Pass email string as-is (can be single or comma-separated)
+                email_input = request.email
+            
+            # Determine search_input based on search method and URL
+            search_input = None
+            if request.url and request.url != "demo":
+                search_input = request.url
+            
+            # Start analysis in background with all parameters
+            logger.info(f"🚀 Starting analysis pipeline for job {job_id}")
+            background_tasks.add_task(
+                self.run_analysis_pipeline,
+                job_id,
+                str(request.url) if request.url else None,
+                html_path,
+                email_input,  # Pass email(s) - can be string or list
+                request.customPrompt,
+                request.searchMethod or "demo",
+                search_input,
+                company_name,
+            )
+            
+            return JobStatus(
+                job_id=job_id,
+                status='queued',
+                progress=0,
+                message='Analysis job queued'
+            )
+        
+        @self.router.get("/api/status/{job_id}", response_model=JobStatus)
+        async def get_job_status(job_id: str):
+            """Get status of analysis job"""
+            if job_id not in self.jobs_db:
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            job = self.jobs_db[job_id]
+            return JobStatus(**job)
+        
+        @self.router.get("/api/results/{job_id}/pdf")
+        async def get_pdf_report(job_id: str):
+            """Download PDF report"""
+            if job_id not in self.jobs_db:
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            if self.jobs_db[job_id]['status'] != 'completed':
+                raise HTTPException(status_code=400, detail="Analysis not completed")
+            
+            pdf_path = f"my_volume/sentiment_analysis/{job_id}/visualizations/sentiment_analysis_report.pdf"
+            
+            if not os.path.exists(pdf_path):
+                raise HTTPException(status_code=404, detail="PDF not found")
+            
+            return FileResponse(
+                pdf_path,
+                media_type='application/pdf',
+                filename=f'sentiment_report_{job_id}.pdf'
+            )
+        
+        @self.router.get("/api/results/{job_id}/data")
+        async def get_results_data(job_id: str):
+            """Get analysis results as JSON"""
+            output_dir = f"my_volume/sentiment_analysis/{job_id}"
+            
+            # Check if results exist on disk (even if not in memory after restart)
+            if not os.path.exists(output_dir):
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            # If in memory, check status
+            if job_id in self.jobs_db and self.jobs_db[job_id]['status'] != 'completed':
+                raise HTTPException(status_code=400, detail="Analysis not completed")
+            
+            # Load results
+            results = {}
+            
+            # Load trends
+            trends_path = f"{output_dir}/sentiment_trends.json"
+            if os.path.exists(trends_path):
+                with open(trends_path, 'r') as f:
+                    results['trends'] = json.load(f)
+            
+            # Load summaries
+            for sentiment in ['positive', 'negative', 'neutral']:
+                summary_path = f"{output_dir}/{sentiment}/{sentiment}_summary.json"
+                if os.path.exists(summary_path):
+                    with open(summary_path, 'r') as f:
+                        results[f'{sentiment}_summary'] = json.load(f)
+            
+            # Load recommendations
+            rec_path = f"{output_dir}/recommendation/recommendation.json"
+            if os.path.exists(rec_path):
+                with open(rec_path, 'r') as f:
+                    results['recommendations'] = json.load(f)
+            
+            # Load statistics from performance_summary.json
+            perf_path = f"{output_dir}/performance_summary.json"
+            if os.path.exists(perf_path):
+                with open(perf_path, 'r') as f:
+                    perf_data = json.load(f)
+                    # Extract statistics in the format expected by frontend
+                    sentiment_dist = perf_data.get('sentiment_distribution', {})
+                    results['statistics'] = {
+                        'total_reviews': perf_data.get('total_samples', 0),
+                        'positive': sentiment_dist.get('POSITIVE', 0),
+                        'negative': sentiment_dist.get('NEGATIVE', 0),
+                        'neutral': sentiment_dist.get('NEUTRAL', 0)
+                    }
+            
+            return JSONResponse(content=results)
+        
+        @self.router.post("/api/upload")
+        async def upload_html_file(
+            file: UploadFile = File(...),
+            background_tasks: BackgroundTasks = None
+        ):
+            """Upload HTML file for analysis"""
+            if not file.filename.endswith('.html'):
+                raise HTTPException(status_code=400, detail="Only HTML files allowed")
+            
+            job_id = str(uuid.uuid4())
+            logger.info(f"📨 New analysis request - Job ID: {job_id}, Method: {request.searchMethod}, URL: {request.url}, Email: {request.email}")
+            cache_folder = f"cache/{job_id}"
+            os.makedirs(cache_folder, exist_ok=True)
+            
+            # Save uploaded file
+            file_path = f"{cache_folder}/{file.filename}"
+            with open(file_path, 'wb') as f:
+                content = await file.read()
+                f.write(content)
+            
+            # Initialize job
+            self.jobs_db[job_id] = {
+                'job_id': job_id,
+                'status': 'queued',
+                'progress': 0,
+                'message': 'File uploaded, analysis queued',
+                'created_at': datetime.now().isoformat()
+            }
+            
+            # Start analysis
+            company_name = self.get_company_name()
+            logger.info(f"🚀 Starting analysis pipeline for job {job_id}")
+            background_tasks.add_task(
+                self.run_analysis_pipeline,
+                job_id,
+                None,
+                file_path,
+                None,  # email
+                None,  # custom_prompt
+                'demo',
+                None,  # search_input
+                company_name
+            )
+            
+            return JobStatus(
+                job_id=job_id,
+                status='queued',
+                progress=0,
+                message='File uploaded and queued for analysis'
+            )
+        
+
+        @self.router.post("/api/chat", response_model=ChatResponse)
+        async def general_chat(request: ChatRequest):
+            """
+            General chatbot WITHOUT requiring analysis results.
+            Handles:
+            - Questions about Andrey Vlasenko (candidate info)
+            - Questions about the platform/features
+            - Form field explanations
+            - Demo mode information
+            - Button/feature descriptions
+            
+            Ask questions like:
+            - "What does Firmenname mean?"
+            - "How do I fill out the form?"
+            - "What is demo mode?"
+            - "Tell me about Andrey"
+            - "What does the Campaign Optimizer do?"
+            - "Is the video AI-generated?"
+            """
+            try:
+                # Create a temporary chatbot instance for general questions
+                # We use a dummy job_id since we don't need analysis context
+                from chatbot_analyzer import ResultsChatbot
+                
+                chatbot = ResultsChatbot(
+                    job_id="general",
+                    analysis_path="",  # No analysis path needed
+                    groq_api_key=os.getenv("GROQ_API_KEY"),
+                    candidate_kb_path="/app/CANDIDATE_KNOWLEDGE_BASE.md"
+                )
+                
+                # Use the new ask_general method
+                answer = chatbot.ask_general(request.question)
+                
+                return ChatResponse(
+                    job_id="general",
+                    question=request.question,
+                    answer=answer,
+                    context_used=True
+                )
+                
+            except Exception as e:
+                logger.error(f"Error in general chat: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Chat error: {str(e)}"
+                )
+
+
+        @self.router.post("/api/results/{job_id}/chat", response_model=ChatResponse)
+        async def chat_with_results(job_id: str, request: ChatRequest):
+            """
+            Interactive chatbot for querying analysis results
+            
+            Ask natural language questions about the sentiment analysis:
+            - "What are customers complaining about?"
+            - "Show me examples of negative feedback"
+            - "What should we fix first?"
+            - etc.
+            """
+            # Check if job exists and is complete
+            if job_id not in self.jobs_db:
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            job = self.jobs_db[job_id]
+            
+            if job['status'] != 'completed':
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Analysis not complete yet. Current status: {job['status']}"
+                )
+            
+            # Check if results exist
+            results_path = f"my_volume/sentiment_analysis/{job_id}"
+            
+            if not os.path.exists(results_path):
+                raise HTTPException(status_code=404, detail="Analysis results not found")
+            
+            # Initialize chatbot if not already created
+            if job_id not in self.chatbots:
+                groq_api_key = os.getenv('GROQ_API_KEY')
+                if not groq_api_key:
+                    raise HTTPException(
+                        status_code=500, 
+                        detail="GROQ_API_KEY not configured on server"
+                    )
+                
+                try:
+                    self.chatbots[job_id] = ResultsChatbot(job_id, results_path, groq_api_key)
+                    logger.info(f"Created new chatbot for job {job_id}")
+                except Exception as e:
+                    logger.error(f"Failed to initialize chatbot: {e}")
+                    raise HTTPException(status_code=500, detail=f"Failed to initialize chatbot: {str(e)}")
+            
+            # Get answer from chatbot
+            try:
+                chatbot = self.chatbots[job_id]
+                answer = chatbot.ask(request.question, include_history=request.include_history)
+                
+                # Get suggested questions for first interaction
+                suggested = None
+                if len(chatbot.conversation_history) <= 2:  # First question
+                    suggested = chatbot.get_suggested_questions()
+                
+                return ChatResponse(
+                    job_id=job_id,
+                    question=request.question,
+                    answer=answer,
+                    suggested_questions=suggested
+                )
+                
+            except Exception as e:
+                logger.error(f"Error in chatbot interaction: {e}")
+                raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
+        
+        @self.router.get("/api/results/{job_id}/chat/suggestions")
+        async def get_chat_suggestions(job_id: str):
+            """Get suggested questions for the chatbot"""
+            # Check if job exists on disk (works even after restart)
+            import os
+            sentiment_trends_path = f'my_volume/sentiment_analysis/{job_id}/sentiment_trends.json'
+            if not os.path.exists(sentiment_trends_path):
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            # Optional: Check in-memory status if available
+            if job_id in self.jobs_db:
+                job = self.jobs_db[job_id]
+                if job['status'] != 'completed':
+                    raise HTTPException(status_code=400, detail="Analysis not complete yet")
+            
+            # Initialize chatbot if needed
+            if job_id not in self.chatbots:
+                results_path = f"my_volume/sentiment_analysis/{job_id}"
+                groq_api_key = os.getenv('GROQ_API_KEY')
+                
+                if not groq_api_key:
+                    raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+                
+                try:
+                    self.chatbots[job_id] = ResultsChatbot(job_id, results_path, groq_api_key)
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Failed to initialize chatbot: {str(e)}")
+            
+            suggestions = self.chatbots[job_id].get_suggested_questions()
+            
+            return {
+                "job_id": job_id,
+                "suggestions": suggestions
+            }
+        
+        @self.router.delete("/api/results/{job_id}/chat/history")
+        async def clear_chat_history(job_id: str):
+            """Clear conversation history for a job's chatbot"""
+            if job_id not in self.chatbots:
+                raise HTTPException(status_code=404, detail="No active chatbot for this job")
+            
+            self.chatbots[job_id].clear_history()
+            
+            return {
+                "job_id": job_id,
+                "message": "Conversation history cleared"
+            }
+        
+
+        @self.router.post("/api/generate-video-script")
+        async def generate_video_script_endpoint(request: dict):
+            """Generate a marketing video script from sentiment analysis results"""
+            job_id = request.get('job_id')
+            language = request.get('language', 'de')
+            duration = request.get('duration', 30)
+            
+            if not job_id:
+                raise HTTPException(status_code=400, detail="job_id required")
+            
+            # Check if job exists on disk (works even after restart)
+            import os
+            sentiment_trends_path = f'my_volume/sentiment_analysis/{job_id}/sentiment_trends.json'
+            if not os.path.exists(sentiment_trends_path):
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            # Optional: Check in-memory status if available
+            if job_id in self.jobs_db:
+                job = self.jobs_db[job_id]
+                if job['status'] != 'completed':
+                    raise HTTPException(status_code=400, detail="Analysis not complete yet")
+            
+            try:
+                from video_script_generator import generate_video_script
+                script = generate_video_script(job_id, language, duration)
+                
+                return {
+                    "job_id": job_id,
+                    "language": language,
+                    "duration": duration,
+                    "hook": script.get('hook', ''),
+                    "key_messages": script.get('key_messages', []),
+                    "call_to_action": script.get('call_to_action', ''),
+                    "visual_suggestions": script.get('visual_suggestions', []),
+                    "image_prompts": script.get('image_prompts', {})
+                }
+                
+            except Exception as e:
+                logger.error(f"Error generating video script: {e}")
+                raise HTTPException(status_code=500, detail=f"Script generation error: {str(e)}")
+
+        @self.router.post("/api/predict-campaign")
+        async def predict_campaign_endpoint(request: dict):
+            """Predict sentiment for campaign message variants"""
+            variants = request.get('variants', [])
+            language = request.get('language', 'en')
+            
+            if not variants or len(variants) == 0:
+                raise HTTPException(status_code=400, detail="At least one variant required")
+            
+            try:
+                from campaign_predictor import predict_campaign_variants
+                job_id = request.get('job_id', None)
+                result = predict_campaign_variants(variants, language, job_id)
+                
+                return {
+                    "predictions": result['predictions'],
+                    "best_variant": result['best_variant'],
+                    "total_analyzed": result['total_analyzed']
+                }
+                
+            except Exception as e:
+                logger.error(f"Error predicting campaign: {e}")
+                raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+
+        @self.router.get("/api/dashboard/{job_id}")
+        async def get_dashboard(job_id: str):
+            """Get real-time dashboard data for a job"""
+            # Check if job exists on disk (works even after restart)
+            import os
+            sentiment_trends_path = f'my_volume/sentiment_analysis/{job_id}/sentiment_trends.json'
+            if not os.path.exists(sentiment_trends_path):
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            # Optional: Check in-memory status if available
+            if job_id in self.jobs_db:
+                job = self.jobs_db[job_id]
+                if job['status'] != 'completed':
+                    raise HTTPException(status_code=400, detail="Analysis not complete yet")
+            
+            try:
+                from dashboard_data import get_dashboard_data
+                data = get_dashboard_data(job_id)
+                return data
+                
+            except Exception as e:
+                logger.error(f"Error getting dashboard data: {e}")
+                raise HTTPException(status_code=500, detail=f"Dashboard error: {str(e)}")
+
+        @self.router.get("/api/dashboard/{job_id}/export")
+        async def export_dashboard(job_id: str):
+            """Export dashboard data as CSV"""
+            if job_id not in self.jobs_db:
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            try:
+                from dashboard_data import export_dashboard_csv
+                from fastapi.responses import Response
+                
+                csv_content = export_dashboard_csv(job_id)
+                
+                return Response(
+                    content=csv_content,
+                    media_type="text/csv",
+                    headers={
+                        "Content-Disposition": f"attachment; filename=dashboard_{job_id}.csv"
+                    }
+                )
+                
+            except Exception as e:
+                logger.error(f"Error exporting dashboard: {e}")
+                raise HTTPException(status_code=500, detail=f"Export error: {str(e)}")

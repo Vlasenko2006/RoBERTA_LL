@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  python-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: sentiment-python-v2
+    ports:
+      - "8001:8000"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - TRANSFORMERS_CACHE=/app/cache
+      - HF_HOME=/app/cache
+      - PYTHONUNBUFFERED=1
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    volumes:
+      - ./my_volume:/app/my_volume
+      - ./cache:/app/cache
+      - ./extracted_text:/app/extracted_text
+    networks:
+      - sentiment-network-v2
+    restart: "no"
+    depends_on:
+      - mlflow
+
+  dotnet-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dotnet
+    container_name: sentiment-dotnet-api-v2
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - PythonServiceUrl=http://python-service:8000
+    depends_on:
+      - python-service
+    networks:
+      - sentiment-network-v2
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: sentiment-frontend-v2
+    ports:
+      - "3001:80"
+    depends_on:
+      - python-service
+    networks:
+      - sentiment-network-v2
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.9.2
+    container_name: sentiment-mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/artifacts
+    volumes:
+      - ./mlflow_data:/mlflow
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
+    networks:
+      - sentiment-network-v2
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  sentiment-network-v2:
+    driver: bridge
