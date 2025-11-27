@@ -8,40 +8,94 @@
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=.net)](https://dotnet.microsoft.com/)
 [![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?logo=mlflow)](https://mlflow.org/)
 
+> **RoBERTa**: AI-powered sentiment analysis platform that transforms customer reviews into actionable business intelligence. Deployed on AWS, powered by DistilBERT and Groq's Llama 3.1, featuring RAG chatbot and automated PDF reporting.
+
+---
+
+## 📑 Table of Contents
+
+- [Summary](#summary)
+- [User Flow](#user-flow)
+- [Screenshots & Demos](#samples-of-roberta-at-various-stages)
+- [Key Features](#key-features)
+- [Architecture Overview](#general-architecture-overview)
+- [Quick Start](#quick-start-on-a-local-machine-your-laptop)
+- [AWS Deployment](#deployment-on-aws-ec2-deployment-guide)
+- [Technology Stack](#technology-stack)
+
 ---
 
 # Roberta — ELT Frontend-Backend System for Content Analysis
 
 ## Summary
-Roberta is a multipurpose ELT frontend-backend universal buseness platform for improving buiseness, assesment of buisneness strategies and suggesting targeting advertisemnt (both: scenario and video). It processes information from both web sources and existing databases. It runs a three-model AI pipeline to analyze content (for example, customer reviews), extracts the most relevant and representative pieces of information (e.g., the most critical and the most typical comments), summarizes findings, and produces text and visual reports — for example, suggestions to improve your business, risk assessments, or insurance‑relevant conclusions. After the report is generated, RoBERTa evaluates proposed business strategies for expected ROI impact, suggests targeted marketing scenarios, and can optionally generate a corresponding promotional video to support rollout.:
 
-## User flow
-- Enter your email.
-- Provide a website or list of websites of interest (e.g., review sites).
-- Click "Send report."
+**RoBERTa** is an enterprise-grade sentiment analysis platform that combines:
 
+- 🤖 **AI-Powered Analysis**: DistilBERT transformer model (66M parameters) for sentiment classification
+- 🔍 **Web Scraping**: Automated data collection from review sites using Selenium
+- 📊 **Visual Reports**: Professional PDF reports with charts, insights, and recommendations
+- 💬 **RAG Chatbot**: Interactive Q&A system using FAISS vector search and Groq's Llama 3.1
+- 🎯 **Campaign Optimizer**: AI-generated marketing strategies with predicted ROI
+- 🎬 **Video Script Generator**: Automated video content creation based on sentiment data
+- ⚖️ **Risk Assessment**: Insurance risk scoring based on sentiment trends
 
-## Report & architecture overview
+### Use Cases
+- Restaurant reputation management
+- Hotel service optimization
+- Product review analysis
+- Insurance underwriting
+- Brand sentiment monitoring
+
+## User Flow
+
+### 3-Step Process
+
+1. **📝 Submit Analysis Request**
+   - Enter your company name and email
+   - Provide target URL (e.g., TripAdvisor, Google Reviews, Yelp)
+   - Optional: Search keywords for Google search method
+   
+2. **⚙️ Automated Processing** (2-5 minutes)
+   - Web scraping with Selenium
+   - Text extraction and cleaning
+   - DistilBERT sentiment classification
+   - AI summary generation via Groq
+   - PDF report creation with charts
+   
+3. **📧 Receive Results**
+   - Professional PDF report emailed automatically
+   - Interactive chatbot for Q&A
+   - Campaign optimizer suggestions
+   - Video script generation (optional)
+
+## Report & Architecture Overview
 - When processing finishes, Roberta emails you a report with charts (for example, trends in positive vs. negative comments).
 - While the report is being generated you can preview an example report and its structure.
 
 
-## How it works (technical flow)
-- A user fills and submits a form in index.html with their name/company, email, search keywords, and optional parameters in the `index.html` form.
-- The FastAPI establishes communcation between frontend (index.html) top-level subroutine in backend (main.api) sending these requests from/to Python block that performs the main processing. The Python pipeline:
-  - Loads the specified sites and performs ELT processing.
-  - Detects and extracts reviews from the raw text using rule-based methods and the DistilBERT model.
-  - Performs vector and semantic analysis to identify the most representative and the most salient comments.
-  - Runs semantic analysis using an LLM (Llama).
-  - Generates textual summaries grouped by sentiment category.
-  - Produces and sends to the user comprehensive .pdf report with:
-    - Sentiment distribution charts
-    - Key insights
-    - Example reviews
-    - Prioritized recommendations for service improvement
-    - Risk assesment
-  - Sends recommendations to the user by email.
-  - Offers strategy analyser and targeted advertisemet scenario.
+## How It Works (Technical Flow)
+
+### Request Processing
+1. User submits form in `index.html` (company name, email, target URL, search keywords)
+2. NGINX proxies request to FastAPI backend (`main_api.py:8001`)
+3. FastAPI creates job ID and starts background task
+
+### Analysis Pipeline
+The Python pipeline executes these steps:
+
+1. **Data Collection**: Loads target sites via Selenium/Requests
+2. **Text Extraction**: Parses HTML and extracts review text using BeautifulSoup
+3. **Sentiment Analysis**: DistilBERT classifies each review (Positive/Negative/Neutral)
+4. **Vector Analysis**: TF-IDF to identify most representative comments
+5. **AI Summarization**: Groq's Llama 3.1 generates category-wise summaries
+6. **PDF Generation**: Creates branded report with:
+   - Sentiment distribution charts
+   - Key insights and trends
+   - Representative review examples
+   - Prioritized recommendations
+   - Risk assessment scores
+7. **Email Delivery**: SMTP sends PDF report to user
+8. **Post-Analysis**: Campaign optimizer and video script generator available
 
 ## Interactive results
 Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generation) over the analysis results, so you can ask for clarifications, explanations of individual comments, or details about the analysis methodology at any time.
@@ -70,18 +124,16 @@ Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generati
 3. Production ready: fully dockerized and scalable — already deployed on AWS (in future on Azure).  
 4. CI/CD ready: automated testing; integration with MLflow (with 15+ metrics) and pytest (21+ pytests).  
 5. Caching support using SQLite or Redis.
-6. RAG augmentation: Database with buiseness rules and report outcomes.
+6. RAG augmentation: Database with business rules and report outcomes.
 
 ---
 
 ## General Architecture Overview
 
 
-Here is the top-level view how Roberta pipeline evaluates. See also `main_api.py` pipeline bbelow
+Here is the top-level view how Roberta pipeline evaluates. See also `main_api.py` pipeline below
 
 ```
-
-\`\`\`
 ┌─────────────┐
 │ index.html  │  User fills form (company, email, URL)
 │ (port 3001) │  JavaScript: fetch('/api/analyze', {POST})
@@ -129,8 +181,6 @@ Here is the top-level view how Roberta pipeline evaluates. See also `main_api.py
                        │  Groq API       │
                        │  (Llama 3.1)    │
                        └─────────────────┘
-\`\`\`
-
 ```
 
 
@@ -142,8 +192,6 @@ load_all_configs()
 ├─► config/config.yaml         # ML: model_name, cache_dir, thresholds
 ├─► config/config_names.yaml   # Branding: colors, company name
 └─► config/config_key.yaml     # Secrets: groq.api_key, email.smtp
-\`\`\`
-
 ```
 
 ### Timing
@@ -298,20 +346,6 @@ FAISS similarity_search → retrieve context → Groq API → response
 Time: 1-3 seconds
 ```
 
-### Request Flow Explained
-
-1. **User** opens frontend at localhost:3000
-2. **Frontend** sends analysis request to .NET API (localhost:5000)
-3. **.NET API** validates request and proxies to Python backend (localhost:8000)
-4. **Python Backend** executes ML pipeline:
-   - Loads DistilBERT model
-   - Analyzes sentiment of each review
-   - Generates LLM summaries via Groq
-   - Logs everything to MLflow
-   - Creates PDF report
-   - Returns results
-5. **Response** flows back: Python → .NET → Frontend → User
-6. **User** can view MLflow experiments at localhost:5002
 
 ---
 
@@ -365,33 +399,14 @@ cd /path/to/Request
 docker compose up -d
 
 # Access services
-open http://localhost:3000  # Frontend (or port 3001, not sure. check the dockerfile)
-open http://localhost:8000/docs  # API Docs Bthw. it might be 8001, check it in the dockerfile
+open http://localhost:3001  # Frontend (or port 3001, not sure. check the dockerfile)
+open http://localhost:8001/docs  # API Docs Bthw. it might be 8001, check it in the dockerfile
 open http://localhost:5002  # MLflow (after setup)
 ```
 
 ---
 
-##  Technology Stack
 
-### Backend
-- **Python 3.10** - ML backend runtime
-- **FastAPI 0.104** - Modern async web framework
-- **DistilBERT** - Transformer model (Hugging Face)
-- **Groq API** - LLM integration (Llama 3.1)
-- **MLflow 2.9+** - Experiment tracking
-- **.NET 8.0** - API gateway (ASP.NET Core)
-
-### Frontend
-- **nginx:alpine** - Web server
-- **HTML/CSS/JS** - User interface
-
-### Infrastructure
-- **Docker Compose** - Multi-container orchestration
-- **pytest 7.4+** - Testing framework
-- **Redis 5.0+** - Caching (ready)
-
----
 
 ##  Deployment on AWS EC2 Deployment Guide
 
