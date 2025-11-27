@@ -13,7 +13,11 @@
 # Roberta — ELT Frontend-Backend System for Content Analysis
 
 ## Summary
-Roberta is a multipurpose ELT frontend-backend universal buseness platform for improving buiseness, assesment of buisneness strategies and suggesting targeting advertisemnt (both: scenario and video). It processes information from both web sources and existing databases. It runs a three-model AI pipeline to analyze content (for example, customer reviews), extracts the most relevant and representative pieces of information (e.g., the most critical and the most typical comments), summarizes findings, and produces text and visual reports — for example, suggestions to improve your business, risk assessments, or insurance‑relevant conclusions. After the report is generated, RoBERTa evaluates proposed business strategies for expected ROI impact, suggests targeted marketing scenarios, and can optionally generate a corresponding promotional video to support rollout.:
+RoBERTA is a versatile ELT (Extract, Load, Transform) platform designed to streamline and enhance business operations. Acting as both a frontend and backend system, RoBERTA helps assess business strategies and suggests targeted advertising campaigns—including scenario-based recommendations and promotional videos.
+
+The platform can process information from web sources as well as existing databases. At its core, RoBERTA employs a three-model AI pipeline (including LLM lama) to analyze content such as customer reviews, extract the most relevant and representative insights (for example, critical feedback and common opinions), and summarize findings. It delivers actionable text and visual reports, including recommendations for business improvement, risk assessments, and insurance-related insights.
+
+After generating a report, RoBERTA evaluates proposed business strategies for their expected ROI impact, suggests targeted marketing approaches, and can optionally create promotional videos to support campaign deployment.
 
 ## User flow
 - Enter your email.
