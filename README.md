@@ -27,7 +27,7 @@ Roberta is an ELT frontend-backend universal platform that processes information
 
 
 ## How it works (technical flow)
-- A user writes and submits his requests (his/company name, e-mail, search keywords, etc.) in the `index.html`
+- A user fills and submits a form in index.html with their name/company, email, search keywords, and optional parameters in the `index.html` form.
 - The FastAPI establishes communcation between frontend (index.html) top-level subroutine in backend (main.api) sending these requests from/to Python block that performs the main processing. The Python pipeline:
   - Loads the specified sites and performs ELT processing.
   - Detects and extracts reviews from the raw text using rule-based methods and the DistilBERT model.
@@ -41,6 +41,7 @@ Roberta is an ELT frontend-backend universal platform that processes information
     - Prioritized recommendations for service improvement
     - Risk assesment
   - Sends recommendations to the user by email.
+  - Offers strategy analyser and targeted advertisemet scenario.
 
 ## Top level Pipleline
 
@@ -55,6 +56,7 @@ Roberta includes a Results Chatbot that uses RAG (Retrieval‑Augmented Generati
 3. Production ready: fully dockerized and scalable — already deployed on AWS (in future on Azure).  
 4. CI/CD ready: automated testing; integration with MLflow (with 15+ metrics) and pytest (21+ pytests).  
 5. Caching support using SQLite or Redis.
+6. RAG augmentation: Database with buiseness rules and report outcomes.
 
 ---
 
